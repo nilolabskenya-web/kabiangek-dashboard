@@ -1,146 +1,114 @@
-// ── Vercel Blob helpers for attendance + file storage ──
+// ── Vercel Blob helpers — simplified: single lessons.json, no attendance ──
 
-import { put, list, del, head } from '@vercel/blob';
-
-const ATTENDANCE_KEY = 'data/attendance.json';
-const LESSONS_PREFIX = 'data/lessons/'; // data/lessons/2026-06-08.json
-
-import type { AttendanceData, Lesson, StatusResponse, Subject } from './types';
+import { put, list } from '@vercel/blob';
+import type { Lesson, LessonMeta, LessonsDb, Subject } from './types';
 import { generateWeekLessons, formatDate, getMonday } from './timetable';
 
-// ── Attendance ──
+const LESSONS_DB_KEY = 'data/lessons.json';
 
-/** Read the full attendance record from Blob storage */
-export async function getAttendanceData(): Promise<AttendanceData> {
+// ── Lessons DB (single blob: lessonId → { topic, notesPath?, slidesPath? }) ──
+
+/** Fetch the entire lessons database from Blob */
+export async function getLessonsDb(): Promise<LessonsDb> {
   try {
-    const { blobs } = await list({ prefix: ATTENDANCE_KEY });
-    if (blobs.length === 0) {
-      return { records: {}, lastUpdated: '' };
-    }
-    const blob = blobs[0];
-    const res = await fetch(blob.url);
-    if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
+    const { blobs } = await list({ prefix: LESSONS_DB_KEY });
+    if (blobs.length === 0) return {};
+    const res = await fetch(blobs[0].url);
+    if (!res.ok) return {};
     return await res.json();
   } catch (e) {
-    console.error('getAttendanceData error:', e);
-    return { records: {}, lastUpdated: '' };
+    console.error('getLessonsDb error:', e);
+    return {};
   }
 }
 
-/** Save attendance data to Blob storage */
-export async function saveAttendanceData(data: AttendanceData): Promise<void> {
-  data.lastUpdated = new Date().toISOString();
-  await put(ATTENDANCE_KEY, JSON.stringify(data, null, 2), {
+/** Save the lessons database to Blob */
+export async function saveLessonsDb(db: LessonsDb): Promise<void> {
+  await put(LESSONS_DB_KEY, JSON.stringify(db, null, 2), {
     access: 'public',
     contentType: 'application/json',
     allowOverwrite: true,
   });
 }
 
-/** Mark a specific lesson as attended or missed */
-export async function markAttendance(
-  lessonId: string,
-  attended: boolean
-): Promise<AttendanceData> {
-  const data = await getAttendanceData();
-  data.records[lessonId] = {
-    lessonId,
-    attended,
-    markedAt: new Date().toISOString(),
-  };
-  await saveAttendanceData(data);
-  return data;
-}
-
-// ── Lessons ──
-
-/** Get lessons for a specific week, merged with attendance + topic data */
+/** Get lessons for a specific week, merged with saved metadata */
 export async function getWeekLessons(weekStartStr?: string): Promise<Lesson[]> {
   const monday = weekStartStr ? new Date(weekStartStr) : getMonday();
   const lessons = generateWeekLessons(monday);
-  const weekKey = formatDate(monday);
 
-  // Load saved lesson metadata (topics, file paths)
-  let savedLessons: Record<string, Partial<Lesson>> = {};
-  try {
-    const { blobs } = await list({ prefix: `${LESSONS_PREFIX}${weekKey}` });
-    if (blobs.length > 0) {
-      const res = await fetch(blobs[0].url);
-      if (res.ok) savedLessons = await res.json();
-    }
-  } catch (e) {
-    console.error('getWeekLessons metadata error:', e);
-  }
+  // Fetch the lessons DB once (cached by Vercel Blob CDN)
+  const db = await getLessonsDb();
 
-  // Load attendance data
-  const attendance = await getAttendanceData();
-
-  // Merge
   return lessons.map((lesson) => {
-    const saved = savedLessons[lesson.id] || {};
-    const att = attendance.records[lesson.id];
+    const meta = db[lesson.id];
+    if (!meta) return lesson;
     return {
       ...lesson,
-      topic: saved.topic || lesson.topic,
-      notesPath: saved.notesPath || lesson.notesPath,
-      slidesPath: saved.slidesPath || lesson.slidesPath,
-      attended: att?.attended ?? null,
-      markedAt: att?.markedAt ?? null,
+      topic: meta.topic || '',
+      notesPath: meta.notesPath || null,
+      slidesPath: meta.slidesPath || null,
     };
   });
 }
 
-/** Save lesson metadata (topics, file paths) for a week */
+/** Update lesson metadata (merges into existing DB) */
 export async function saveWeekLessons(
-  weekStart: string,
-  lessonsData: Record<string, Partial<Lesson>>
+  _weekStart: string,
+  lessonsData: Record<string, Partial<LessonMeta>>
 ): Promise<void> {
-  await put(`${LESSONS_PREFIX}${weekStart}.json`, JSON.stringify(lessonsData, null, 2), {
-    access: 'public',
-    contentType: 'application/json',
-    allowOverwrite: true,
-  });
+  const db = await getLessonsDb();
+  for (const [id, meta] of Object.entries(lessonsData)) {
+    db[id] = {
+      topic: meta.topic || db[id]?.topic || '',
+      notesPath: meta.notesPath || db[id]?.notesPath,
+      slidesPath: meta.slidesPath || db[id]?.slidesPath,
+    };
+  }
+  await saveLessonsDb(db);
 }
 
 // ── Status (for cron pipeline) ──
 
-/**
- * Get generation status for the cron pipeline.
- * Returns which subjects should have next lessons generated.
- * A subject should be generated if its most recent past lesson was attended
- * (or if there's no prior lesson record — i.e., first week).
- */
+export interface StatusResponse {
+  weekStart: string;
+  subjects: {
+    subject: Subject;
+    lastLessonId: string;
+    lastLessonDate: string;
+    hasMaterials: boolean;
+    shouldGenerate: boolean;
+  }[];
+}
+
+/** Check which subjects need generation for the target week */
 export async function getGenerationStatus(weekStartStr: string): Promise<StatusResponse> {
   const targetMonday = new Date(weekStartStr);
   const prevMonday = new Date(targetMonday);
   prevMonday.setDate(prevMonday.getDate() - 7);
 
-  // Get last week's lessons + this week's template
   const lastWeekLessons = await getWeekLessons(formatDate(prevMonday));
   const thisWeekLessons = generateWeekLessons(targetMonday);
 
-  // Group last week's lessons by subject
   const lastBySubject: Record<string, Lesson> = {};
   for (const l of lastWeekLessons) {
-    // Keep the latest lesson per subject (some subjects have multiple per week)
     if (!lastBySubject[l.subject] || l.date > lastBySubject[l.subject].date) {
       lastBySubject[l.subject] = l;
     }
   }
 
-  // Get unique subjects for the target week
   const subjects = [...new Set(thisWeekLessons.map((l) => l.subject))] as Subject[];
 
   return {
     weekStart: weekStartStr,
     subjects: subjects.map((subject) => {
       const last = lastBySubject[subject];
+      const hasMaterials = last ? !!(last.notesPath || last.slidesPath) : false;
       return {
         subject,
         lastLessonId: last?.id || '',
         lastLessonDate: last?.date || '',
-        attended: last?.attended ?? null,
-        shouldGenerate: last ? last.attended !== false : true, // generate if no prior lesson or attended
+        hasMaterials,
+        shouldGenerate: last ? hasMaterials : true,
       };
     }),
   };
@@ -148,7 +116,6 @@ export async function getGenerationStatus(weekStartStr: string): Promise<StatusR
 
 // ── File upload ──
 
-/** Upload a file to Blob storage and return the URL */
 export async function uploadFile(
   filename: string,
   content: Buffer | Blob,

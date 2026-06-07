@@ -20,22 +20,39 @@ const SUBJECT_EMOJI: Record<string, string> = {
   'G9 Pre-tech Studies': '⚙️',
 };
 
+// Optimized: fetch once and cache the lessons DB response
+let cachedLessons: { weekStart: string; lessons: Lesson[] } | null = null;
+let cachedWeek = '';
+
 export default function TeachingCalendar() {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [weekStart, setWeekStart] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchLessons = useCallback(async (week: string) => {
+    // Use cache for instant back-navigation
+    if (cachedWeek === week && cachedLessons) {
+      setLessons(cachedLessons.lessons);
+      setWeekStart(cachedLessons.weekStart);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
+    setError(null);
     try {
       const res = await fetch(`/api/lessons?week=${week}`);
       if (!res.ok) throw new Error('Failed to fetch');
       const data = await res.json();
       setLessons(data.lessons);
       setWeekStart(data.weekStart);
+      cachedLessons = data;
+      cachedWeek = week;
     } catch (e) {
       console.error(e);
+      setError('Could not load lessons. Try refreshing.');
     } finally {
       setLoading(false);
     }
@@ -45,7 +62,7 @@ export default function TeachingCalendar() {
     fetchLessons(formatDate(getMonday()));
   }, [fetchLessons]);
 
-  // Color: green = has files (taught), gray = no files (pending)
+  // Color: green = has files, gray = no files yet
   const events = lessons.map((lesson) => {
     const date = lesson.date;
     const [startTime, endTime] = lesson.timeSlot.split('-');
@@ -89,37 +106,34 @@ export default function TeachingCalendar() {
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
       {/* Header */}
-      <header className="bg-gray-900 border-b border-gray-800 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between flex-wrap gap-3">
+      <header className="bg-gray-900 border-b border-gray-800 px-4 sm:px-6 py-3 sm:py-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between flex-wrap gap-2">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold">📅 Kabiangek Dashboard</h1>
-            <p className="text-sm text-gray-400 mt-0.5">{weekLabel}</p>
+            <h1 className="text-lg sm:text-2xl font-bold">📅 Kabiangek Dashboard</h1>
+            <p className="text-xs sm:text-sm text-gray-400 mt-0.5">{weekLabel}</p>
           </div>
           <div className="flex gap-1.5">
-            <button onClick={handlePrevWeek} className="px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-700 transition-colors text-gray-300">
+            <button onClick={handlePrevWeek} className="px-3 py-1.5 text-xs sm:text-sm bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-700 transition-colors text-gray-300">
               ← Prev
             </button>
-            <button onClick={handleToday} className="px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-700 transition-colors text-gray-300">
+            <button onClick={handleToday} className="px-3 py-1.5 text-xs sm:text-sm bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-700 transition-colors text-gray-300">
               Today
             </button>
-            <button onClick={handleNextWeek} className="px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-700 transition-colors text-gray-300">
+            <button onClick={handleNextWeek} className="px-3 py-1.5 text-xs sm:text-sm bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-700 transition-colors text-gray-300">
               Next →
             </button>
           </div>
         </div>
       </header>
 
-      {/* Legend */}
-      <div className="max-w-7xl mx-auto px-6 py-3 flex gap-5 text-xs sm:text-sm">
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm bg-green-800 border border-green-700"></span>
-          <span className="text-gray-400">Has materials (taught)</span>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm bg-gray-700 border border-gray-600"></span>
-          <span className="text-gray-400">Pending</span>
-        </span>
-      </div>
+      {/* Error */}
+      {error && (
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="bg-red-900/30 border border-red-800/50 rounded-lg px-4 py-3 text-sm text-red-300">
+            {error}
+          </div>
+        </div>
+      )}
 
       {/* Loading */}
       {loading && (
@@ -131,7 +145,7 @@ export default function TeachingCalendar() {
 
       {/* Calendar */}
       {!loading && (
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 pb-8">
+        <div className="max-w-7xl mx-auto px-2 sm:px-6 pb-8 pt-4">
           <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
             <style jsx global>{`
               .fc {
@@ -182,7 +196,7 @@ export default function TeachingCalendar() {
         </div>
       )}
 
-      {/* Lesson Modal — files only, no attendance */}
+      {/* Lesson Modal */}
       {selectedLesson && (
         <div
           className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm"
@@ -224,20 +238,7 @@ export default function TeachingCalendar() {
                 <p className="text-sm text-gray-600 italic">No topic recorded</p>
               )}
 
-              {/* Status */}
-              <div className={`rounded-lg px-3 py-2.5 border ${
-                hasFiles(selectedLesson)
-                  ? 'bg-green-900/20 border-green-800/50'
-                  : 'bg-gray-800/50 border-gray-700'
-              }`}>
-                <p className={`text-sm font-medium ${
-                  hasFiles(selectedLesson) ? 'text-green-400' : 'text-gray-500'
-                }`}>
-                  {hasFiles(selectedLesson) ? '✅ Materials available — lesson was taught' : '⏳ No materials yet'}
-                </p>
-              </div>
-
-              {/* Files */}
+              {/* Downloads */}
               <div>
                 <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Downloads</h3>
                 {hasFiles(selectedLesson) ? (

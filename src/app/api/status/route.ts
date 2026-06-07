@@ -1,5 +1,4 @@
 // ── GET /api/status?week=YYYY-MM-DD — cron pipeline checks which subjects to generate
-// Returns: { subjects: [{ subject, attended, shouldGenerate }] }
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getGenerationStatus } from '@/lib/blob';
@@ -10,7 +9,6 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const weekStr = searchParams.get('week');
 
-    // Default to next week (what the Friday generator needs)
     const now = new Date();
     const nextMonday = getMonday(now);
     nextMonday.setDate(nextMonday.getDate() + 7);
