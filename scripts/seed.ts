@@ -25,22 +25,22 @@ if (!BLOB_TOKEN) {
 
 const WEEK_MAY25: Record<string, { topic: string; notesPath?: string; slidesPath?: string }> = {
   '2026-05-25-g7-agriculture':             { topic: 'Knitting Intro: Meaning, Tools, Materials, Basic Stitches' },
-  '2026-05-26-g9-pre-tech-studies':        { topic: 'Handling Waste Materials: 8 Types + Safe Handling Methods' },
+  '2026-05-26-g9-pre-tech':        { topic: 'Handling Waste Materials: 8 Types + Safe Handling Methods' },
   '2026-05-26-g7-agriculture':             { topic: 'Knitting Patterns & Techniques' },
   '2026-05-27-g7-agriculture':             { topic: 'Practical Knitting Projects & Review' },
-  '2026-05-28-g7-pre-tech-studies':        { topic: 'Metallic vs Non-metallic Materials' },
-  '2026-05-29-g9-pre-tech-studies':        { topic: 'Reduce, Reuse & Practical Waste Management' },
-  '2026-05-29-g7-pre-tech-studies':        { topic: 'Production of Goods & Services: Meaning, Types, Factors' },
+  '2026-05-28-g7-pre-tech':        { topic: 'Metallic vs Non-metallic Materials' },
+  '2026-05-29-g9-pre-tech':        { topic: 'Reduce, Reuse & Practical Waste Management' },
+  '2026-05-29-g7-pre-tech':        { topic: 'Production of Goods & Services: Meaning, Types, Factors' },
 };
 
 const WEEK_JUNE1: Record<string, { topic: string; notesPath?: string; slidesPath?: string }> = {
   '2026-06-01-g7-agriculture':             { topic: 'Crochet: Meaning, Tools, Materials & Basic Stitches' },
-  '2026-06-02-g9-pre-tech-studies':        { topic: 'Environmental Conservation: Meaning, Importance & Degradation' },
+  '2026-06-02-g9-pre-tech':        { topic: 'Environmental Conservation: Meaning, Importance & Degradation' },
   '2026-06-02-g7-agriculture':             { topic: 'Crochet Patterns & Advanced Techniques' },
   '2026-06-03-g7-agriculture':             { topic: 'Practical Crochet Projects & Strand 4 Review' },
-  '2026-06-04-g7-pre-tech-studies':        { topic: 'Introduction to Entrepreneurship: Meaning of Entrepreneur' },
-  '2026-06-05-g9-pre-tech-studies':        { topic: 'Environmental Conservation Methods & Practices' },
-  '2026-06-05-g7-pre-tech-studies':        { topic: 'Characteristics of Entrepreneurs & Types of Business Enterprises' },
+  '2026-06-04-g7-pre-tech':        { topic: 'Introduction to Entrepreneurship: Meaning of Entrepreneur' },
+  '2026-06-05-g9-pre-tech':        { topic: 'Environmental Conservation Methods & Practices' },
+  '2026-06-05-g7-pre-tech':        { topic: 'Characteristics of Entrepreneurs & Types of Business Enterprises' },
 };
 
 // Attendance: all lessons marked MISSED (false) for both weeks
@@ -73,6 +73,7 @@ async function main() {
   await put('data/attendance.json', JSON.stringify(attendance, null, 2), {
     access: 'public',
     contentType: 'application/json',
+    allowOverwrite: true,
   });
   console.log('   ✅ attendance.json uploaded');
 
@@ -81,12 +82,14 @@ async function main() {
   await put('data/lessons/2026-05-25.json', JSON.stringify(WEEK_MAY25, null, 2), {
     access: 'public',
     contentType: 'application/json',
+    allowOverwrite: true,
   });
   console.log('   ✅ Week May 25 uploaded');
 
   await put('data/lessons/2026-06-01.json', JSON.stringify(WEEK_JUNE1, null, 2), {
     access: 'public',
     contentType: 'application/json',
+    allowOverwrite: true,
   });
   console.log('   ✅ Week June 1 uploaded');
 

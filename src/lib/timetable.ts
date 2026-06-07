@@ -45,7 +45,7 @@ export function formatDate(d: Date): string {
 
 /** Generate lesson ID from date and subject */
 export function lessonId(date: string, subject: Subject): string {
-  const slug = subject.toLowerCase().replace(/\s+/g, '-').replace('studies', '');
+  const slug = subject.toLowerCase().replace(/\s+/g, '-').replace('-studies', '');
   return `${date}-${slug}`;
 }
 
