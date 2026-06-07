@@ -73,8 +73,6 @@ export function generateWeekLessons(weekStart: Date): Lesson[] {
       topic: '',
       notesPath: null,
       slidesPath: null,
-      attended: null,
-      markedAt: null,
     });
   }
 
