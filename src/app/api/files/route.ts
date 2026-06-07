@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
     const { url } = await put(`files/${name}`, file, {
       access: 'public',
       contentType: file.type,
+      allowOverwrite: true,
     });
 
     return NextResponse.json({ url, filename: name });
