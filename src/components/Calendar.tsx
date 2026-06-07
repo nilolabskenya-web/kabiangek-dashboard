@@ -5,11 +5,24 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import type { Lesson, AttendanceData } from '@/lib/types';
+import type { Lesson } from '@/lib/types';
 import { getWeekLabel, getMonday, formatDate } from '@/lib/timetable';
 
+// Short display names for calendar cells
+const SUBJECT_SHORT: Record<string, string> = {
+  'G7 Agriculture': 'G7 Agri',
+  'G7 Pre-tech Studies': 'G7 Pre-tech',
+  'G9 Pre-tech Studies': 'G9 Pre-tech',
+};
+
+const SUBJECT_EMOJI: Record<string, string> = {
+  'G7 Agriculture': '🌱',
+  'G7 Pre-tech Studies': '🔧',
+  'G9 Pre-tech Studies': '⚙️',
+};
+
 interface CalendarProps {
-  initialWeek?: string; // YYYY-MM-DD (Monday)
+  initialWeek?: string;
 }
 
 export default function TeachingCalendar({ initialWeek }: CalendarProps) {
@@ -42,25 +55,35 @@ export default function TeachingCalendar({ initialWeek }: CalendarProps) {
     fetchLessons(week);
   }, [initialWeek, fetchLessons]);
 
-  // Convert lessons to FullCalendar events
   const events = lessons.map((lesson) => {
     const date = lesson.date;
     const [startTime, endTime] = lesson.timeSlot.split('-');
-    const color = lesson.attended === true
-      ? '#16a34a'  // green — attended
-      : lesson.attended === false
-        ? '#dc2626'  // red — missed
-        : '#6b7280'; // gray — pending
+
+    let bgColor: string;
+    let textColor: string;
+    if (lesson.attended === true) {
+      bgColor = '#166534'; // green-800
+      textColor = '#bbf7d0'; // green-200
+    } else if (lesson.attended === false) {
+      bgColor = '#991b1b'; // red-800
+      textColor = '#fecaca'; // red-200
+    } else {
+      bgColor = '#374151'; // gray-700
+      textColor = '#e5e7eb'; // gray-200
+    }
+
+    const shortName = SUBJECT_SHORT[lesson.subject] || lesson.subject;
+    const emoji = SUBJECT_EMOJI[lesson.subject] || '';
 
     return {
       id: lesson.id,
-      title: `${lesson.subject.split(' ')[0]} ${lesson.grade} Agri${lesson.subject.includes('Pre-tech') ? ' Pre-tech' : ''}`,
+      title: `${emoji} ${shortName}`,
       start: `${date}T${startTime}:00`,
       end: `${date}T${endTime}:00`,
-      backgroundColor: color,
-      borderColor: color,
+      backgroundColor: bgColor,
+      borderColor: bgColor,
+      textColor,
       extendedProps: { lesson },
-      classNames: ['cursor-pointer', 'text-sm'],
     };
   });
 
@@ -83,12 +106,12 @@ export default function TeachingCalendar({ initialWeek }: CalendarProps) {
         body: JSON.stringify({ lessonId: selectedLesson.id, attended }),
       });
       if (!res.ok) throw new Error('Failed to save');
-      // Refresh lessons
       await fetchLessons(weekStart);
-      // Update selected lesson
-      setSelectedLesson((prev) => prev ? { ...prev, attended, markedAt: new Date().toISOString() } : null);
+      setSelectedLesson((prev) =>
+        prev ? { ...prev, attended, markedAt: new Date().toISOString() } : null
+      );
     } catch (e: any) {
-      setError('Failed to save attendance. Check console.');
+      setError('Failed to save attendance.');
       console.error(e);
     } finally {
       setSaving(false);
@@ -114,30 +137,30 @@ export default function TeachingCalendar({ initialWeek }: CalendarProps) {
   const weekLabel = weekStart ? getWeekLabel(new Date(weekStart)) : '';
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+    <div className="min-h-screen bg-gray-950 text-gray-100">
+      {/* ── Header ── */}
+      <header className="bg-gray-900 border-b border-gray-800 px-6 py-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">📅 Kabiangek Teaching Dashboard</h1>
-            <p className="text-sm text-gray-500 mt-1">{weekLabel}</p>
+            <h1 className="text-xl sm:text-2xl font-bold">📅 Kabiangek Dashboard</h1>
+            <p className="text-sm text-gray-400 mt-0.5">{weekLabel}</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             <button
               onClick={handlePrevWeek}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
+              className="px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-700 transition-colors text-gray-300"
             >
               ← Prev
             </button>
             <button
               onClick={handleToday}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
+              className="px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-700 transition-colors text-gray-300"
             >
-              This Week
+              Today
             </button>
             <button
               onClick={handleNextWeek}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-md hover:bg-gray-100 transition-colors"
+              className="px-3 py-1.5 text-sm bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-700 transition-colors text-gray-300"
             >
               Next →
             </button>
@@ -145,189 +168,313 @@ export default function TeachingCalendar({ initialWeek }: CalendarProps) {
         </div>
       </header>
 
-      {/* Legend */}
-      <div className="max-w-6xl mx-auto px-6 py-3 flex gap-4 text-sm">
+      {/* ── Legend ── */}
+      <div className="max-w-7xl mx-auto px-6 py-3 flex gap-5 text-xs sm:text-sm">
         <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded bg-green-600"></span> Attended
+          <span className="w-3 h-3 rounded-sm bg-green-800 border border-green-700"></span>
+          <span className="text-gray-400">Attended</span>
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded bg-red-600"></span> Missed
+          <span className="w-3 h-3 rounded-sm bg-red-800 border border-red-700"></span>
+          <span className="text-gray-400">Missed</span>
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded bg-gray-500"></span> Pending
+          <span className="w-3 h-3 rounded-sm bg-gray-700 border border-gray-600"></span>
+          <span className="text-gray-400">Pending</span>
         </span>
       </div>
 
-      {/* Error banner */}
+      {/* ── Error ── */}
       {error && (
-        <div className="max-w-6xl mx-auto px-6 mb-4">
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+        <div className="max-w-7xl mx-auto px-6 mb-3">
+          <div className="bg-red-900/50 border border-red-800 text-red-300 px-4 py-2.5 rounded-lg text-sm">
             {error}
           </div>
         </div>
       )}
 
-      {/* Loading state */}
+      {/* ── Loading ── */}
       {loading && (
-        <div className="max-w-6xl mx-auto px-6 py-12 text-center text-gray-500">
-          <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-3"></div>
-          Loading lessons...
+        <div className="max-w-7xl mx-auto px-6 py-16 text-center">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+          <p className="text-gray-500 text-sm">Loading lessons…</p>
         </div>
       )}
 
-      {/* Calendar */}
+      {/* ── Calendar ── */}
       {!loading && (
-        <div className="max-w-6xl mx-auto px-6 pb-8">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-            <FullCalendar
-              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-              initialView="timeGridWeek"
-              headerToolbar={{
-                left: '',
-                center: '',
-                right: '',
-              }}
-              events={events}
-              eventClick={handleEventClick}
-              height="auto"
-              allDaySlot={false}
-              slotMinTime="08:00:00"
-              slotMaxTime="16:00:00"
-              weekends={false}
-              firstDay={1}
-              hiddenDays={[]}
-              initialDate={weekStart || undefined}
-              slotLabelFormat={{
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false,
-              }}
-              eventTimeFormat={{
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false,
-              }}
-              dayHeaderFormat={{ weekday: 'short', day: 'numeric', month: 'short' }}
-            />
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 pb-8">
+          <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden">
+            <style jsx global>{`
+              /* ── FullCalendar Dark Theme ── */
+              .fc {
+                --fc-border-color: #1f2937;
+                --fc-page-bg-color: #111827;
+                --fc-neutral-bg-color: #1f2937;
+                --fc-neutral-text-color: #9ca3af;
+                --fc-today-bg-color: rgba(59, 130, 246, 0.08);
+              }
+              .fc .fc-toolbar-title {
+                font-size: 1rem;
+                font-weight: 600;
+                color: #e5e7eb;
+              }
+              .fc .fc-button {
+                background: #1f2937;
+                border-color: #374151;
+                color: #d1d5db;
+                font-size: 0.8rem;
+                padding: 0.35rem 0.75rem;
+              }
+              .fc .fc-button:hover {
+                background: #374151;
+              }
+              .fc .fc-button-active {
+                background: #3b82f6 !important;
+                border-color: #3b82f6 !important;
+              }
+              .fc .fc-col-header-cell {
+                background: #1f2937;
+                color: #d1d5db;
+                padding: 8px 4px;
+                font-size: 0.75rem;
+                font-weight: 600;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+              }
+              .fc .fc-timegrid-slot {
+                height: 3rem;
+                border-bottom: 1px solid #1f2937;
+              }
+              .fc .fc-timegrid-slot-label {
+                font-size: 0.7rem;
+                color: #6b7280;
+              }
+              .fc .fc-timegrid-axis {
+                background: #111827;
+                border-color: #1f2937;
+              }
+              .fc .fc-timegrid-now-indicator-line {
+                border-color: #3b82f6;
+              }
+              .fc .fc-timegrid-now-indicator-arrow {
+                border-color: #3b82f6;
+              }
+              .fc .fc-event {
+                border-radius: 6px;
+                font-size: 0.75rem;
+                padding: 3px 6px;
+                cursor: pointer;
+                border: 1px solid rgba(255,255,255,0.08);
+                overflow: hidden;
+                white-space: nowrap;
+                text-overflow: ellipsis;
+              }
+              .fc .fc-event:hover {
+                filter: brightness(1.15);
+              }
+              .fc .fc-timegrid-event .fc-event-time {
+                font-size: 0.7rem;
+                opacity: 0.8;
+              }
+              .fc .fc-timegrid-event .fc-event-title {
+                font-weight: 500;
+                font-size: 0.75rem;
+              }
+              .fc .fc-scrollgrid {
+                border-color: #1f2937 !important;
+              }
+              .fc .fc-scrollgrid td {
+                border-color: #1f2937 !important;
+              }
+              .fc .fc-scroller {
+                scrollbar-width: thin;
+                scrollbar-color: #374151 #111827;
+              }
+              @media (max-width: 640px) {
+                .fc .fc-col-header-cell {
+                  font-size: 0.65rem;
+                  padding: 6px 2px;
+                }
+                .fc .fc-event {
+                  font-size: 0.65rem;
+                  padding: 2px 4px;
+                }
+                .fc .fc-timegrid-event .fc-event-title {
+                  font-size: 0.65rem;
+                }
+              }
+            `}</style>
+            <div className="p-2 sm:p-4">
+              <FullCalendar
+                plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                initialView="timeGridWeek"
+                headerToolbar={{
+                  left: '',
+                  center: '',
+                  right: '',
+                }}
+                events={events}
+                eventClick={handleEventClick}
+                height="auto"
+                allDaySlot={false}
+                slotMinTime="08:00:00"
+                slotMaxTime="16:00:00"
+                weekends={false}
+                firstDay={1}
+                hiddenDays={[]}
+                initialDate={weekStart || undefined}
+                slotLabelFormat={{
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: false,
+                }}
+                eventTimeFormat={{
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: false,
+                }}
+                dayHeaderFormat={{
+                  weekday: 'short',
+                  day: 'numeric',
+                  month: 'short',
+                }}
+              />
+            </div>
           </div>
         </div>
       )}
 
-      {/* Lesson Detail Modal */}
+      {/* ── Lesson Modal ── */}
       {selectedLesson && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={handleCloseModal}>
+        <div
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm"
+          onClick={handleCloseModal}
+        >
           <div
-            className="bg-white rounded-xl shadow-xl max-w-md w-full p-6"
+            className="bg-gray-900 border border-gray-700 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Header */}
-            <div className="flex items-start justify-between mb-4">
+            {/* Modal header */}
+            <div className="px-5 py-4 border-b border-gray-800 flex items-start justify-between">
               <div>
-                <h2 className="text-lg font-bold text-gray-900">{selectedLesson.subject}</h2>
-                <p className="text-sm text-gray-500">
-                  {selectedLesson.dayOfWeek}, {selectedLesson.date} • {selectedLesson.timeSlot}
-                </p>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {selectedLesson.lessonType === 'double' ? 'Double lesson (80 min)' : 'Single lesson (40 min)'}
+                <span className="text-xs text-gray-500 font-mono">
+                  {selectedLesson.grade} • {selectedLesson.lessonType === 'double' ? '80 min' : '40 min'}
+                </span>
+                <h2 className="text-lg font-bold text-white mt-0.5">
+                  {SUBJECT_EMOJI[selectedLesson.subject]} {selectedLesson.subject}
+                </h2>
+                <p className="text-sm text-gray-400 mt-0.5">
+                  {selectedLesson.dayOfWeek} {selectedLesson.date} • {selectedLesson.timeSlot}
                 </p>
               </div>
               <button
                 onClick={handleCloseModal}
-                className="text-gray-400 hover:text-gray-600 text-xl leading-none"
+                className="text-gray-500 hover:text-gray-300 text-xl leading-none p-1"
               >
                 ✕
               </button>
             </div>
 
-            {/* Topic */}
-            {selectedLesson.topic && (
-              <div className="bg-blue-50 border border-blue-100 rounded-md px-3 py-2 mb-4">
-                <span className="text-xs text-blue-500 font-semibold uppercase">Topic</span>
-                <p className="text-sm text-blue-900">{selectedLesson.topic}</p>
+            <div className="px-5 py-4 space-y-4">
+              {/* Topic */}
+              {selectedLesson.topic && (
+                <div className="bg-blue-900/30 border border-blue-800/50 rounded-lg px-3 py-2.5">
+                  <p className="text-xs text-blue-400 font-semibold uppercase tracking-wide mb-0.5">
+                    Topic
+                  </p>
+                  <p className="text-sm text-blue-200">{selectedLesson.topic}</p>
+                </div>
+              )}
+
+              {/* Attendance */}
+              <div>
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                  Attendance
+                </h3>
+                {selectedLesson.attended === null ? (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleMarkAttendance(true)}
+                      disabled={saving}
+                      className="flex-1 px-3 py-2.5 bg-green-700 text-white text-sm font-medium rounded-lg hover:bg-green-600 disabled:opacity-40 transition-colors"
+                    >
+                      ✅ Attended
+                    </button>
+                    <button
+                      onClick={() => handleMarkAttendance(false)}
+                      disabled={saving}
+                      className="flex-1 px-3 py-2.5 bg-red-800 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-40 transition-colors"
+                    >
+                      ❌ Missed
+                    </button>
+                  </div>
+                ) : selectedLesson.attended === true ? (
+                  <div className="bg-green-900/30 border border-green-800/50 rounded-lg px-3 py-2.5 flex items-center justify-between">
+                    <span className="text-sm text-green-300 font-medium">✅ Attended</span>
+                    <button
+                      onClick={() => handleMarkAttendance(false)}
+                      disabled={saving}
+                      className="text-xs text-red-400 hover:text-red-300 hover:underline"
+                    >
+                      Change
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-red-900/30 border border-red-800/50 rounded-lg px-3 py-2.5 flex items-center justify-between">
+                    <span className="text-sm text-red-300 font-medium">❌ Missed</span>
+                    <button
+                      onClick={() => handleMarkAttendance(true)}
+                      disabled={saving}
+                      className="text-xs text-green-400 hover:text-green-300 hover:underline"
+                    >
+                      Change
+                    </button>
+                  </div>
+                )}
+                {saving && (
+                  <p className="text-xs text-gray-500 mt-1.5">Saving…</p>
+                )}
               </div>
-            )}
 
-            {/* Attendance Status */}
-            <div className="mb-4">
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Attendance</h3>
-              {selectedLesson.attended === null ? (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleMarkAttendance(true)}
-                    disabled={saving}
-                    className="flex-1 px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 disabled:opacity-50 transition-colors"
-                  >
-                    ✅ I Attended
-                  </button>
-                  <button
-                    onClick={() => handleMarkAttendance(false)}
-                    disabled={saving}
-                    className="flex-1 px-3 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 disabled:opacity-50 transition-colors"
-                  >
-                    ❌ I Missed
-                  </button>
-                </div>
-              ) : selectedLesson.attended === true ? (
-                <div className="bg-green-50 border border-green-200 rounded-md px-3 py-2 flex items-center justify-between">
-                  <span className="text-sm text-green-700">✅ Attended</span>
-                  <button
-                    onClick={() => handleMarkAttendance(false)}
-                    disabled={saving}
-                    className="text-xs text-red-600 hover:underline"
-                  >
-                    Change to Missed
-                  </button>
-                </div>
-              ) : (
-                <div className="bg-red-50 border border-red-200 rounded-md px-3 py-2 flex items-center justify-between">
-                  <span className="text-sm text-red-700">❌ Missed</span>
-                  <button
-                    onClick={() => handleMarkAttendance(true)}
-                    disabled={saving}
-                    className="text-xs text-green-600 hover:underline"
-                  >
-                    Change to Attended
-                  </button>
-                </div>
-              )}
-              {saving && (
-                <p className="text-xs text-gray-400 mt-1">Saving...</p>
-              )}
+              {/* Materials */}
+              <div>
+                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                  Materials
+                </h3>
+                {selectedLesson.notesPath || selectedLesson.slidesPath ? (
+                  <div className="space-y-1.5">
+                    {selectedLesson.notesPath && (
+                      <a
+                        href={selectedLesson.notesPath}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-750 transition-colors text-sm text-gray-200"
+                      >
+                        <span className="text-base">📄</span> Download Notes
+                      </a>
+                    )}
+                    {selectedLesson.slidesPath && (
+                      <a
+                        href={selectedLesson.slidesPath}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-lg hover:bg-gray-750 transition-colors text-sm text-gray-200"
+                      >
+                        <span className="text-base">📊</span> Download Slides
+                      </a>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-600 italic">No materials yet</p>
+                )}
+              </div>
             </div>
 
-            {/* Files */}
-            <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Materials</h3>
-              {selectedLesson.notesPath || selectedLesson.slidesPath ? (
-                <div className="space-y-2">
-                  {selectedLesson.notesPath && (
-                    <a
-                      href={selectedLesson.notesPath}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md hover:bg-gray-100 transition-colors text-sm"
-                    >
-                      📄 Download Notes (.docx)
-                    </a>
-                  )}
-                  {selectedLesson.slidesPath && (
-                    <a
-                      href={selectedLesson.slidesPath}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md hover:bg-gray-100 transition-colors text-sm"
-                    >
-                      📊 Download Slides (.pptx)
-                    </a>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400 italic">No materials uploaded yet.</p>
-              )}
+            {/* Footer */}
+            <div className="px-5 py-3 bg-gray-950 border-t border-gray-800">
+              <p className="text-[10px] text-gray-700 font-mono truncate">{selectedLesson.id}</p>
             </div>
-
-            {/* Lesson ID (debug) */}
-            <p className="text-xs text-gray-300 mt-4 font-mono">{selectedLesson.id}</p>
           </div>
         </div>
       )}
