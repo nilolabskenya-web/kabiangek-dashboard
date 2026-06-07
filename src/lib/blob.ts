@@ -33,6 +33,7 @@ export async function saveAttendanceData(data: AttendanceData): Promise<void> {
   await put(ATTENDANCE_KEY, JSON.stringify(data, null, 2), {
     access: 'public',
     contentType: 'application/json',
+    allowOverwrite: true,
   });
 }
 
@@ -97,6 +98,7 @@ export async function saveWeekLessons(
   await put(`${LESSONS_PREFIX}${weekStart}.json`, JSON.stringify(lessonsData, null, 2), {
     access: 'public',
     contentType: 'application/json',
+    allowOverwrite: true,
   });
 }
 
@@ -155,6 +157,7 @@ export async function uploadFile(
   const { url } = await put(`files/${filename}`, content, {
     access: 'public',
     contentType,
+    allowOverwrite: true,
   });
   return url;
 }
