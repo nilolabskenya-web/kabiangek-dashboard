@@ -62,20 +62,20 @@ export default function TeachingCalendar() {
     fetchLessons(formatDate(getMonday()));
   }, [fetchLessons]);
 
-  // Color: green = has files, gray = no files yet
+  // Color: green = topic covered, yellow/amber = not yet covered
   const events = lessons.map((lesson) => {
     const date = lesson.date;
     const [startTime, endTime] = lesson.timeSlot.split('-');
-    const hasFiles = !!(lesson.notesPath || lesson.slidesPath);
+    const hasTopic = !!(lesson.topic);
 
     return {
       id: lesson.id,
       title: `${SUBJECT_EMOJI[lesson.subject]} ${SUBJECT_SHORT[lesson.subject]}`,
       start: `${date}T${startTime}:00`,
       end: `${date}T${endTime}:00`,
-      backgroundColor: hasFiles ? '#166534' : '#374151',
-      borderColor: hasFiles ? '#15803d' : '#4b5563',
-      textColor: hasFiles ? '#bbf7d0' : '#e5e7eb',
+      backgroundColor: hasTopic ? '#166534' : '#92400e',
+      borderColor: hasTopic ? '#15803d' : '#b45309',
+      textColor: hasTopic ? '#bbf7d0' : '#fde68a',
       extendedProps: { lesson },
     };
   });
@@ -101,7 +101,7 @@ export default function TeachingCalendar() {
   };
 
   const weekLabel = weekStart ? getWeekLabel(new Date(weekStart)) : '';
-  const hasFiles = (l: Lesson) => !!(l.notesPath || l.slidesPath);
+  const hasTopic = (l: Lesson) => !!(l.topic);
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
@@ -241,7 +241,7 @@ export default function TeachingCalendar() {
               {/* Downloads */}
               <div>
                 <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Downloads</h3>
-                {hasFiles(selectedLesson) ? (
+                {(selectedLesson.notesPath || selectedLesson.slidesPath) ? (
                   <div className="space-y-1.5">
                     {selectedLesson.notesPath && (
                       <a
