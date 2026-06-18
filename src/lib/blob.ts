@@ -4,21 +4,28 @@ import { put, list } from '@vercel/blob';
 import type { Lesson, LessonMeta, LessonsDb, Subject } from './types';
 import { generateWeekLessons, formatDate, getMonday } from './timetable';
 
-const LESSONS_DB_KEY = 'data/lessons.json';
+const LESSONS_DB_KEY = 'data/lessons-v2.json';
+const BLOB_STORE_URL = 'https://lwl0vea488ilvyqs.public.blob.vercel-storage.com';
 
 // ── Lessons DB (single blob: lessonId → { topic, notesPath?, slidesPath? }) ──
 
 /** Fetch the entire lessons database from Blob */
 export async function getLessonsDb(): Promise<LessonsDb> {
   try {
-    const { blobs } = await list({ prefix: LESSONS_DB_KEY });
-    if (blobs.length === 0) return {};
-    // Sort by uploadedAt descending — newest first (each put() creates a new blob)
-    const sorted = blobs.sort((a, b) =>
-      new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-    );
-    const res = await fetch(sorted[0].url);
-    if (!res.ok) return {};
+    // Fetch directly from well-known URL with cache-busting (list() is CDN-cached)
+    const url = `${BLOB_STORE_URL}/${LESSONS_DB_KEY}?t=${Date.now()}`;
+    const res = await fetch(url, { cache: 'no-store' });
+    if (!res.ok) {
+      // Fallback: try list() if direct URL fails
+      const { blobs } = await list({ prefix: LESSONS_DB_KEY });
+      if (blobs.length === 0) return {};
+      const sorted = blobs.sort((a, b) =>
+        new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+      );
+      const fallback = await fetch(sorted[0].url + '?t=' + Date.now(), { cache: 'no-store' });
+      if (!fallback.ok) return {};
+      return await fallback.json();
+    }
     return await res.json();
   } catch (e) {
     console.error('getLessonsDb error:', e);
