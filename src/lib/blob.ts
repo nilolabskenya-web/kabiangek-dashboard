@@ -1,6 +1,6 @@
 // ── Vercel Blob helpers — simplified: single lessons.json, no attendance ──
 
-import { put, list } from '@vercel/blob';
+import { put, list, del } from '@vercel/blob';
 import type { Lesson, LessonMeta, LessonsDb, Subject } from './types';
 import { generateWeekLessons, formatDate, getMonday } from './timetable';
 
@@ -13,7 +13,11 @@ export async function getLessonsDb(): Promise<LessonsDb> {
   try {
     const { blobs } = await list({ prefix: LESSONS_DB_KEY });
     if (blobs.length === 0) return {};
-    const res = await fetch(blobs[0].url);
+    // Sort by uploadedAt descending — newest first (each put() creates a new blob)
+    const sorted = blobs.sort((a, b) =>
+      new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+    );
+    const res = await fetch(sorted[0].url);
     if (!res.ok) return {};
     return await res.json();
   } catch (e) {
@@ -24,6 +28,15 @@ export async function getLessonsDb(): Promise<LessonsDb> {
 
 /** Save the lessons database to Blob */
 export async function saveLessonsDb(db: LessonsDb): Promise<void> {
+  // Clean up old blobs to prevent stale reads
+  try {
+    const { blobs } = await list({ prefix: LESSONS_DB_KEY });
+    for (const blob of blobs) {
+      await del(blob.url);
+    }
+  } catch (e) {
+    console.error('saveLessonsDb cleanup error:', e);
+  }
   await put(LESSONS_DB_KEY, JSON.stringify(db, null, 2), {
     access: 'public',
     contentType: 'application/json',
