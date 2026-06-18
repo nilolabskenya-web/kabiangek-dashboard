@@ -4,7 +4,7 @@ import { put, list } from '@vercel/blob';
 import type { Lesson, LessonMeta, LessonsDb, Subject } from './types';
 import { generateWeekLessons, formatDate, getMonday } from './timetable';
 
-const LESSONS_DB_KEY = 'data/lessons-v2.json';
+const LESSONS_DB_KEY = 'data/lessons.json';
 const BLOB_STORE_URL = 'https://lwl0vea488ilvyqs.public.blob.vercel-storage.com';
 
 // ── Lessons DB (single blob: lessonId → { topic, notesPath?, slidesPath? }) ──
