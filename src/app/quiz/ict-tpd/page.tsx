@@ -157,7 +157,7 @@ export default function QuizPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Jane Muthoni"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 onKeyDown={(e) => e.key === "Enter" && handleStart()}
               />
             </div>
@@ -168,7 +168,7 @@ export default function QuizPage() {
                 value={tscNo}
                 onChange={(e) => setTscNo(e.target.value)}
                 placeholder="e.g. 123456"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-base text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 onKeyDown={(e) => e.key === "Enter" && handleStart()}
               />
             </div>

@@ -1,10 +1,10 @@
 // ── POST /api/quiz/submit — save a teacher's quiz submission to Vercel Blob ──
+// ── Each submission is a separate blob → no race conditions with 40+ concurrent users ──
 
 import { NextRequest, NextResponse } from "next/server";
-import { put, list } from "@vercel/blob";
+import { put } from "@vercel/blob";
 
-const QUIZ_DB_KEY = "data/quiz-submissions.json";
-const BLOB_STORE_URL = "https://lwl0vea488ilvyqs.public.blob.vercel-storage.com";
+const QUIZ_PREFIX = "data/quiz-submissions";
 
 interface QuizSubmission {
   id: string;
@@ -30,8 +30,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const submission: QuizSubmission = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id,
       name: String(name).trim(),
       tscNo: tscNo ? String(tscNo).trim() : undefined,
       answers,
@@ -42,27 +43,13 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString(),
     };
 
-    // Fetch existing submissions
-    let submissions: QuizSubmission[] = [];
-    try {
-      const url = `${BLOB_STORE_URL}/${QUIZ_DB_KEY}?t=${Date.now()}`;
-      const res = await fetch(url, { cache: "no-store" });
-      if (res.ok) submissions = await res.json();
-    } catch {
-      // First submission — start fresh
-    }
-
-    // Add new submission
-    submissions.push(submission);
-
-    // Save back to Blob
-    await put(QUIZ_DB_KEY, JSON.stringify(submissions, null, 2), {
+    // Each submission gets its own blob — zero race conditions at any scale
+    await put(`${QUIZ_PREFIX}/${id}.json`, JSON.stringify(submission), {
       access: "public",
       contentType: "application/json",
-      allowOverwrite: true,
     });
 
-    return NextResponse.json({ success: true, id: submission.id });
+    return NextResponse.json({ success: true, id });
   } catch (e: any) {
     console.error("Quiz submit error:", e);
     return NextResponse.json({ error: e.message }, { status: 500 });
